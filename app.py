@@ -13,6 +13,8 @@ class State(TypedDict):
     current_file: str
     reviewed_files: List[str]
     reviews: Dict[str, str]
+    root_folder: str
+    files_remaining: bool
 
 # Initialize LLM
 llm = ChatOpenAI(api_key=openai_key)
@@ -73,11 +75,10 @@ def generate_markdown(state: State):
         review = state["reviews"][file]
         f.write(f"## {file}\n\n{review}\n\n")
     
-    # Check if we've reviewed all files
-    if not state["reviewed_files"]:
-        return "end"
-    else:
-        return "traverse"
+    # Check 
+    state["files_remaining"] = bool(state["reviewed_files"])
+    
+    return state
       
 def end_state(state: State):
   return True
@@ -89,9 +90,12 @@ workflow.add_node("generate", generate_markdown)
 workflow.add_node("end", end_state)
 
 # Define edges 
+workflow.add_edge("traverse", "review")
 workflow.add_edge("review", "generate")
-workflow.add_edge("generate", "traverse")
-workflow.add_edge("generate", "end")
+workflow.add_conditional_edges(
+    "generate",
+    lambda x: "traverse" if x["files_remaining"] else "end"
+)
 
 # Set entry/exit point
 workflow.set_entry_point("traverse")
