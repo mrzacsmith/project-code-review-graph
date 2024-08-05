@@ -2,6 +2,7 @@ import os
 from typing import List, Dict
 from langchain.llms import OpenAI
 from langgraph.graph import StateGraph, Graph
+from typing import List, Dict, TypedDict
 
 # Define the state structure
 class State(TypedDict):
