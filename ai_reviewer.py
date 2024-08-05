@@ -73,7 +73,8 @@ def generate_markdown(state: State):
     with open(file_path, "a") as f:
         file = state["current_file"]
         review = state["reviews"][file]
-        f.write(f"## {file}\n\n{review}\n\n")
+        # print(f"REVIEW REVIEW: {review.content}")
+        f.write(f"## {file}\n\n{review.content}\n\n")
     
     return state
       
@@ -105,7 +106,7 @@ initial_state = {
     "current_file": "",
     "reviewed_files": [],
     "reviews": {},
-    "root_folder": "/Users/codeshock/software/code-shock/lead-magnet",
+    "root_folder": "/Users/codeshock/software/code-shock/lead-magnet/src",
     "files_remaining": True
 }
 
@@ -114,7 +115,7 @@ try:
         print(f"Current state: {state}")
         if 'traverse' in state:
             traverse_state = state['traverse']
-            print(f"Current file: {traverse_state.get('current_file', 'No file')}")
+            # print(f"Current file: {traverse_state.get('current_file', 'No file')}")
             print(f"Files remaining: {traverse_state.get('files_remaining', False)}")
         else:
             print("Unexpected state structure:", state)
