@@ -60,26 +60,43 @@ def review_code(state: State):
     return "traverse"
 
 def generate_markdown(state: State):
-    output = "# Code Review Summary\n\n"
-    for file, review in state["reviews"].items():
-        output += f"## {file}\n\n{review}\n\n"
+    file_path = "code_review_summary.md"
     
-    with open("code_review_summary.md", "w") as f:
-        f.write(output)
+    # If the file doesn't exist, create it with a header
+    if not os.path.exists(file_path):
+        with open(file_path, "w") as f:
+            f.write("# Code Review Summary\n\n")
     
-    return "end"
+    # Append the new review to the file
+    with open(file_path, "a") as f:
+        file = state["current_file"]
+        review = state["reviews"][file]
+        f.write(f"## {file}\n\n{review}\n\n")
+    
+    # Check if we've reviewed all files
+    if not state["reviewed_files"]:
+        return "end"
+    else:
+        return "traverse"
+      
+def end_state(state: State):
+  return True
 
 # Add nodes to graph
 workflow.add_node("traverse", traverse_files)
 workflow.add_node("review", review_code)
 workflow.add_node("generate", generate_markdown)
+workflow.add_node("end", end_state)
 
 # Define edges 
-workflow.add_edge("traverse", "review")
 workflow.add_edge("review", "generate")
+workflow.add_edge("generate", "traverse")
+workflow.add_edge("generate", "end")
 
-# Set entry point
+# Set entry/exit point
 workflow.set_entry_point("traverse")
+workflow.set_finish_point("end")
+
 
 # Compile the graph
 graph = workflow.compile()
