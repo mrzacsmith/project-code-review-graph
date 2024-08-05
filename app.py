@@ -39,11 +39,35 @@ def traverse_files(state: State):
     
     return "review"
 
-def review_code(state):
-    pass
+def review_code(state: State):
+    with open(state["current_file"], 'r') as file:
+        content = file.read()
+    
+    prompt = f"""
+    Review the following code file and provide a brief summary of its purpose and its connections to other files:
 
-def generate_markdown(state):
-    pass
+    File: {state["current_file"]}
+
+    Content:
+    {content}
+
+    Summary:
+    """
+
+    review = llm(prompt)
+    state["reviews"][state["current_file"]] = review
+
+    return "traverse"
+
+def generate_markdown(state: State):
+    output = "# Code Review Summary\n\n"
+    for file, review in state["reviews"].items():
+        output += f"## {file}\n\n{review}\n\n"
+    
+    with open("code_review_summary.md", "w") as f:
+        f.write(output)
+    
+    return "end"
 
 # Add nodes to graph
 workflow.add_node("traverse", traverse_files)
@@ -62,21 +86,21 @@ graph = workflow.compile()
 
 
 #Visualize graph
-def save_graph_as_png(graph: Graph, filename: str, directory: str = "."):
-    # Ensure the directory exists
-    os.makedirs(directory, exist_ok=True)
+# def save_graph_as_png(graph: Graph, filename: str, directory: str = "."):
+#     # Ensure the directory exists
+#     os.makedirs(directory, exist_ok=True)
     
-    # Generate the Mermaid diagram as PNG
-    png_data = graph.get_graph().draw_mermaid_png()
+#     # Generate the Mermaid diagram as PNG
+#     png_data = graph.get_graph().draw_mermaid_png()
     
-    # Create the full file path
-    file_path = os.path.join(directory, filename)
+#     # Create the full file path
+#     file_path = os.path.join(directory, filename)
     
-    # Save the PNG data to a file
-    with open(file_path, "wb") as f:
-        f.write(png_data)
+#     # Save the PNG data to a file
+#     with open(file_path, "wb") as f:
+#         f.write(png_data)
     
-    print(f"Graph saved as PNG to: {file_path}")
+#     print(f"Graph saved as PNG to: {file_path}")
 
-# Usage
-save_graph_as_png(graph, "workflow_diagram.png", "./")
+# # Usage
+# save_graph_as_png(graph, "workflow_diagram.png", "./")
