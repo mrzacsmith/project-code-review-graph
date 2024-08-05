@@ -1,14 +1,12 @@
 import os
-from typing import List, Dict
-from langchain_openai import OpenAI, ChatOpenAI
-from langgraph.graph import StateGraph, Graph
 from typing import List, Dict, TypedDict
+from langchain_openai import ChatOpenAI
+from langgraph.graph import StateGraph, Graph
 from dotenv import load_dotenv
 
 load_dotenv()
 openai_key = os.getenv("OPENAI_API_KEY2")
 
-# Define the state structure
 class State(TypedDict):
     current_file: str
     reviewed_files: List[str]
@@ -16,20 +14,22 @@ class State(TypedDict):
     root_folder: str
     files_remaining: bool
 
-# Initialize LLM
-llm = ChatOpenAI(api_key=openai_key)
+llm = ChatOpenAI(api_key=openai_key, model="gpt-4o-mini")
 
-# Define graph
 workflow = StateGraph(State)
 
-# Define nodes 
 def traverse_files(state: State):
-    root_folder = "path/to/your/root/folder"
+    root_folder = state["root_folder"]
     all_files = []
     for root, dirs, files in os.walk(root_folder):
         for file in files:
-            if file.endswith(('.py', '.js', '.java', '.cpp')):  # Add more extensions as needed
+            if file.endswith(('.py', '.js')):
                 all_files.append(os.path.join(root, file))
+    
+    if not all_files and not state["reviewed_files"]:
+        state["files_remaining"] = False
+        state["current_file"] = ""
+        return state
     
     if not state["reviewed_files"]:
         state["current_file"] = all_files[0]
@@ -37,9 +37,12 @@ def traverse_files(state: State):
     elif state["reviewed_files"]:
         state["current_file"] = state["reviewed_files"].pop(0)
     else:
-        return "generate"
+        state["files_remaining"] = False
+        state["current_file"] = ""
+        return state
     
-    return "review"
+    state["files_remaining"] = bool(state["reviewed_files"])
+    return state
 
 def review_code(state: State):
     with open(state["current_file"], 'r') as file:
@@ -58,70 +61,66 @@ def review_code(state: State):
 
     review = llm(prompt)
     state["reviews"][state["current_file"]] = review
-
-    return "traverse"
+    return state
 
 def generate_markdown(state: State):
     file_path = "code_review_summary.md"
     
-    # If the file doesn't exist, create it with a header
     if not os.path.exists(file_path):
         with open(file_path, "w") as f:
             f.write("# Code Review Summary\n\n")
     
-    # Append the new review to the file
     with open(file_path, "a") as f:
         file = state["current_file"]
         review = state["reviews"][file]
         f.write(f"## {file}\n\n{review}\n\n")
     
-    # Check 
-    state["files_remaining"] = bool(state["reviewed_files"])
-    
     return state
       
 def end_state(state: State):
-  return True
+    return state
 
-# Add nodes to graph
 workflow.add_node("traverse", traverse_files)
 workflow.add_node("review", review_code)
 workflow.add_node("generate", generate_markdown)
 workflow.add_node("end", end_state)
 
-# Define edges 
-workflow.add_edge("traverse", "review")
+
+workflow.add_conditional_edges(
+    "traverse",
+    lambda x: "review" if x["files_remaining"] else "end"
+)
 workflow.add_edge("review", "generate")
 workflow.add_conditional_edges(
     "generate",
     lambda x: "traverse" if x["files_remaining"] else "end"
 )
 
-# Set entry/exit point
 workflow.set_entry_point("traverse")
 workflow.set_finish_point("end")
 
-
-# Compile the graph
 graph = workflow.compile()
 
+initial_state = {
+    "current_file": "",
+    "reviewed_files": [],
+    "reviews": {},
+    "root_folder": "/Users/codeshock/software/code-shock/lead-magnet",
+    "files_remaining": True
+}
 
-#Visualize graph
-# def save_graph_as_png(graph: Graph, filename: str, directory: str = "."):
-#     # Ensure the directory exists
-#     os.makedirs(directory, exist_ok=True)
-    
-#     # Generate the Mermaid diagram as PNG
-#     png_data = graph.get_graph().draw_mermaid_png()
-    
-#     # Create the full file path
-#     file_path = os.path.join(directory, filename)
-    
-#     # Save the PNG data to a file
-#     with open(file_path, "wb") as f:
-#         f.write(png_data)
-    
-#     print(f"Graph saved as PNG to: {file_path}")
+try:
+    for state in graph.stream(initial_state):
+        print(f"Current state: {state}")
+        if 'traverse' in state:
+            traverse_state = state['traverse']
+            print(f"Current file: {traverse_state.get('current_file', 'No file')}")
+            print(f"Files remaining: {traverse_state.get('files_remaining', False)}")
+        else:
+            print("Unexpected state structure:", state)
+        print("---")
+except Exception as e:
+    print(f"An error occurred: {str(e)}")
+    import traceback
+    traceback.print_exc()
 
-# # Usage
-# save_graph_as_png(graph, "workflow_diagram.png", "./")
